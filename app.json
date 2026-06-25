@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Spirit Squad Coach HQ",
+    "slug": "spirit-squad-coach-hq",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "spiritsquad",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2B2030"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.spiritsquad.coachhq"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2B2030"
+      },
+      "package": "com.spiritsquad.coachhq"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-image-picker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#2B2030"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
