@@ -28,6 +28,12 @@ export interface Season {
 
 // ─── Athlete ──────────────────────────────────────────────────────────────────
 
+export interface Parent {
+  name: string;
+  email: string;
+  phone: string;
+}
+
 export interface Athlete {
   id: number;
   teamId: number;
@@ -38,9 +44,7 @@ export interface Athlete {
   email: string;
   phone: string;
   isYouth: boolean;
-  parentName: string;
-  parentEmail: string;
-  parentPhone: string;
+  parents: Parent[];
   emergencyName: string;
   emergencyPhone: string;
 }
@@ -130,6 +134,69 @@ export interface ScheduleEvent {
   time: string;
   type: EventType;
   priority: number;
+}
+
+// ─── Coach ────────────────────────────────────────────────────────────────────
+
+export type CoachPermission = 'admin' | 'editor' | 'viewer';
+
+export interface CoachTeamAssignment {
+  teamId: number;
+  teamName: string;
+  season: string;
+  role: string;
+}
+
+export interface EmergencyContact {
+  name: string;
+  relationship: string;
+  phone: string;
+  email?: string;
+}
+
+export interface Coach {
+  id: number;
+  name: string;
+  role: string;
+  email: string;
+  phone: string;
+  permissions: CoachPermission;
+  teamAssignments: CoachTeamAssignment[];
+  emergencyContacts?: EmergencyContact[];
+}
+
+// ─── Competition Scoring ──────────────────────────────────────────────────────
+
+export interface CompetitionScore {
+  id: number;
+  teamId: number;
+  season: string;
+  competitionName: string;
+  date: string;
+  rubricId: string;
+  scores: Record<string, number>;
+  totalScore: number;
+  notes: string;
+}
+
+export interface RubricSubcategory {
+  id: string;
+  name: string;
+  maxPoints: number;
+}
+
+export interface RubricCategory {
+  id: string;
+  name: string;
+  maxPoints: number;
+  subcategories?: RubricSubcategory[];
+}
+
+export interface CustomRubric {
+  id: string;
+  name: string;
+  totalPoints: number;
+  categories: RubricCategory[];
 }
 
 // ─── Settings ─────────────────────────────────────────────────────────────────

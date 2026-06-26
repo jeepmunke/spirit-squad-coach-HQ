@@ -1,13 +1,17 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type {
   Team, Athlete, EvalLogEntry, StuntGroup, GroupLogEntry,
   Pyramid, AttendanceMap, ScheduleEvent, AttendanceThresholds, RatingDisplayMode,
+  Coach, CompetitionScore, CustomRubric,
 } from '@/types';
+import type { ThemeColors } from '@/constants/theme';
 import { ATTENDANCE_PRESETS, SKILL_LIBRARY, RATING_LEVELS } from '@/constants/skills';
+import type { RatingKey } from '@/constants/skills';
 import { DEFAULT_THEME_KEY } from '@/constants/theme';
 
-let _nextId = 1000;
-const genId = () => _nextId++;
+const genId = () => Date.now() + Math.floor(Math.random() * 10000);
 
 // ─── helpers (pure, no store deps) ───────────────────────────────────────────
 
@@ -61,13 +65,15 @@ export function numericRating(key: string): number {
 interface AppState {
   // Theme
   themeKey: string;
-  customTheme: { primary: string; accent: string };
+  customTheme: Partial<ThemeColors>;
   setThemeKey: (key: string) => void;
-  setCustomTheme: (t: { primary: string; accent: string }) => void;
+  setTheme: (key: string) => void;
+  setCustomTheme: (t: Partial<ThemeColors>) => void;
 
   // Pro
   isPro: boolean;
   setIsPro: (v: boolean) => void;
+  togglePro: () => void;
   ratingDisplayMode: RatingDisplayMode;
   setRatingDisplayMode: (m: RatingDisplayMode) => void;
 
@@ -76,7 +82,26 @@ interface AppState {
   activeTeamId: number;
   setActiveTeamId: (id: number) => void;
   setTeams: (teams: Team[]) => void;
-  addTeam: () => void;
+  addTeam: (name?: string) => void;
+  updateTeam: (id: number, data: Partial<Omit<Team, 'id'>>) => void;
+  removeTeam: (id: number) => void;
+
+  // Coaches
+  coaches: Coach[];
+  addCoach: (data: Partial<Omit<Coach, 'id'>>) => void;
+  updateCoach: (id: number, data: Partial<Omit<Coach, 'id'>>) => void;
+  removeCoach: (id: number) => void;
+
+  // Competition scores
+  competitionScores: CompetitionScore[];
+  addCompetitionScore: (s: Omit<CompetitionScore, 'id'>) => void;
+  updateCompetitionScore: (id: number, data: Partial<Omit<CompetitionScore, 'id'>>) => void;
+  removeCompetitionScore: (id: number) => void;
+
+  // Custom rubrics (Pro)
+  customRubrics: CustomRubric[];
+  addCustomRubric: (r: Omit<CustomRubric, 'id'>) => void;
+  removeCustomRubric: (id: string) => void;
 
   // Seasons
   seasons: string[];
@@ -85,18 +110,20 @@ interface AppState {
   setSeason: (s: string) => void;
   setCurrentSeason: (s: string) => void;
   setSeasons: (seasons: string[]) => void;
-  addSeason: () => void;
+  addSeason: (name?: string) => void;
+  removeSeason: (name: string) => void;
 
   // Athletes
   athletes: Athlete[];
   setAthletes: (a: Athlete[]) => void;
   addAthlete: (a: Omit<Athlete, 'id' | 'teamId' | 'photo'>) => void;
+  updateAthlete: (id: number, data: Partial<Omit<Athlete, 'id' | 'teamId'>>) => void;
   removeAthlete: (id: number) => void;
   updateAthletePhoto: (id: number, photo: string) => void;
 
   // Eval log
   evalLog: EvalLogEntry[];
-  logRating: (params: { athleteId: number; category: string; skill: string; position?: string; rating: string }) => void;
+  logRating: (params: { athleteId: number; category: string; skill: string; position?: string; rating: RatingKey }) => void;
 
   // N/A skills
   naSkills: Record<number, Record<string, boolean>>;
@@ -105,8 +132,8 @@ interface AppState {
   // Combo/custom skill names
   comboNames: Record<string, string>;
   setComboName: (key: string, name: string) => void;
-  customSkills: { jumps: string[]; tumbling: string[] };
-  addCustomSkill: (category: 'jumps' | 'tumbling') => void;
+  customSkills: Record<string, string[]>;
+  addCustomSkill: (category: string) => void;
 
   // Stunt groups
   groups: StuntGroup[];
@@ -156,28 +183,54 @@ interface AppState {
 const INITIAL_SEASONS = ['2025 Fall', '2026 Spring', '2026 Fall'];
 const INITIAL_CURRENT_SEASON = '2026 Fall';
 
-export const useAppStore = create<AppState>((set, get) => ({
+export const useAppStore = create<AppState>()(
+  persist(
+    (set, get) => ({
   // Theme
   themeKey: DEFAULT_THEME_KEY,
   customTheme: { primary: '#2B2030', accent: '#E8A33D' },
   setThemeKey: (key) => set({ themeKey: key }),
+  setTheme: (key) => set({ themeKey: key }),
   setCustomTheme: (t) => set({ customTheme: t }),
 
   // Pro
   isPro: false,
   setIsPro: (v) => set({ isPro: v }),
+  togglePro: () => set((s) => ({ isPro: !s.isPro })),
   ratingDisplayMode: 'color',
   setRatingDisplayMode: (m) => set({ ratingDisplayMode: m }),
 
   // Teams
   teams: [
-    { id: 1, name: 'Varsity Cheer', division: 'Large Varsity', level: 'Level 5', coaches: ['Coach Williams', 'Coach Martinez'] },
-    { id: 2, name: 'JV Cheer', division: 'Medium JV', level: 'Level 3', coaches: ['Coach Williams'] },
+    { id: 1, name: 'Varsity Cheer', division: 'Large Varsity', level: 'Level 5', coaches: [] },
+    { id: 2, name: 'JV Cheer', division: 'Medium JV', level: 'Level 3', coaches: [] },
   ],
   activeTeamId: 1,
   setActiveTeamId: (id) => set({ activeTeamId: id }),
   setTeams: (teams) => set({ teams }),
-  addTeam: () => set((s) => ({ teams: [...s.teams, { id: genId(), name: 'New Team', division: '', level: '', coaches: [] }] })),
+  addTeam: (name) => set((s) => ({ teams: [...s.teams, { id: genId(), name: name ?? 'New Team', division: '', level: '', coaches: [] }] })),
+  updateTeam: (id, data) => set((s) => ({ teams: s.teams.map((t) => t.id === id ? { ...t, ...data } : t) })),
+  removeTeam: (id) => set((s) => ({ teams: s.teams.filter((t) => t.id !== id) })),
+
+  // Coaches
+  coaches: [
+    { id: 1, name: 'Coach Williams', role: 'Head Coach', email: 'williams@school.edu', phone: '555-100-2233', permissions: 'admin', teamAssignments: [{ teamId: 1, teamName: 'Varsity Cheer', season: '2026 Fall', role: 'Head Coach' }, { teamId: 1, teamName: 'Varsity Cheer', season: '2025 Fall', role: 'Head Coach' }] },
+    { id: 2, name: 'Coach Martinez', role: 'Assistant Coach', email: 'martinez@school.edu', phone: '555-200-3344', permissions: 'editor', teamAssignments: [{ teamId: 1, teamName: 'Varsity Cheer', season: '2026 Fall', role: 'Assistant Coach' }] },
+  ] as Coach[],
+  addCoach: (data) => set((s) => ({ coaches: [...s.coaches, { id: genId(), name: '', role: '', email: '', phone: '', permissions: 'viewer', teamAssignments: [], ...data }] })),
+  updateCoach: (id, data) => set((s) => ({ coaches: s.coaches.map((c) => c.id === id ? { ...c, ...data } : c) })),
+  removeCoach: (id) => set((s) => ({ coaches: s.coaches.filter((c) => c.id !== id) })),
+
+  // Competition scores
+  competitionScores: [],
+  addCompetitionScore: (s) => set((st) => ({ competitionScores: [...st.competitionScores, { ...s, id: genId() }] })),
+  updateCompetitionScore: (id, data) => set((st) => ({ competitionScores: st.competitionScores.map((s) => s.id === id ? { ...s, ...data } : s) })),
+  removeCompetitionScore: (id) => set((st) => ({ competitionScores: st.competitionScores.filter((s) => s.id !== id) })),
+
+  // Custom rubrics
+  customRubrics: [],
+  addCustomRubric: (r) => set((s) => ({ customRubrics: [...s.customRubrics, { ...r, id: `custom_${genId()}` }] })),
+  removeCustomRubric: (id) => set((s) => ({ customRubrics: s.customRubrics.filter((r) => r.id !== id) })),
 
   // Seasons
   seasons: INITIAL_SEASONS,
@@ -186,18 +239,20 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSeason: (season) => set({ season }),
   setCurrentSeason: (currentSeason) => set({ currentSeason }),
   setSeasons: (seasons) => set({ seasons }),
-  addSeason: () => set((s) => ({ seasons: [...s.seasons, 'New Season'] })),
+  addSeason: (name) => set((s) => ({ seasons: [...s.seasons, name ?? 'New Season'] })),
+  removeSeason: (name) => set((s) => ({ seasons: s.seasons.filter((sn) => sn !== name) })),
 
   // Athletes
   athletes: [
-    { id: 1, teamId: 1, name: 'Maddie Carter', grade: '10th', position: 'Flyer', photo: null, email: 'maddie@email.com', phone: '555-201-3344', isYouth: true, parentName: 'Lisa Carter', parentEmail: 'lisa@email.com', parentPhone: '555-201-9988', emergencyName: 'Tom Carter', emergencyPhone: '555-201-7766' },
-    { id: 2, teamId: 1, name: 'Jordan Lee', grade: '11th', position: 'Base', photo: null, email: 'jordan@email.com', phone: '555-330-1122', isYouth: true, parentName: 'Karen Lee', parentEmail: 'karen@email.com', parentPhone: '555-330-4455', emergencyName: '', emergencyPhone: '' },
-    { id: 3, teamId: 1, name: 'Ava Brooks', grade: '9th', position: 'Tumbler', photo: null, email: 'ava@email.com', phone: '555-440-2233', isYouth: false, parentName: '', parentEmail: '', parentPhone: '', emergencyName: 'Mark Brooks', emergencyPhone: '555-440-9900' },
-    { id: 4, teamId: 1, name: 'Sophia Diaz', grade: '12th', position: 'Back Spot', photo: null, email: 'sophia@email.com', phone: '555-550-3344', isYouth: false, parentName: '', parentEmail: '', parentPhone: '', emergencyName: '', emergencyPhone: '' },
-    { id: 5, teamId: 2, name: 'Riley Johnson', grade: '9th', position: 'Flyer', photo: null, email: 'riley@email.com', phone: '555-660-4455', isYouth: true, parentName: 'Dana Johnson', parentEmail: 'dana@email.com', parentPhone: '555-660-7788', emergencyName: '', emergencyPhone: '' },
+    { id: 1, teamId: 1, name: 'Maddie Carter', grade: '10th', position: 'Flyer', photo: null, email: 'maddie@email.com', phone: '555-201-3344', isYouth: true, parents: [{ name: 'Lisa Carter', email: 'lisa@email.com', phone: '555-201-9988' }], emergencyName: 'Tom Carter', emergencyPhone: '555-201-7766' },
+    { id: 2, teamId: 1, name: 'Jordan Lee', grade: '11th', position: 'Base', photo: null, email: 'jordan@email.com', phone: '555-330-1122', isYouth: true, parents: [{ name: 'Karen Lee', email: 'karen@email.com', phone: '555-330-4455' }], emergencyName: '', emergencyPhone: '' },
+    { id: 3, teamId: 1, name: 'Ava Brooks', grade: '9th', position: 'Tumbler', photo: null, email: 'ava@email.com', phone: '555-440-2233', isYouth: false, parents: [], emergencyName: 'Mark Brooks', emergencyPhone: '555-440-9900' },
+    { id: 4, teamId: 1, name: 'Sophia Diaz', grade: '12th', position: 'Back Spot', photo: null, email: 'sophia@email.com', phone: '555-550-3344', isYouth: false, parents: [], emergencyName: '', emergencyPhone: '' },
+    { id: 5, teamId: 2, name: 'Riley Johnson', grade: '9th', position: 'Flyer', photo: null, email: 'riley@email.com', phone: '555-660-4455', isYouth: true, parents: [{ name: 'Dana Johnson', email: 'dana@email.com', phone: '555-660-7788' }], emergencyName: '', emergencyPhone: '' },
   ],
   setAthletes: (athletes) => set({ athletes }),
-  addAthlete: (a) => set((s) => ({ athletes: [...s.athletes, { ...a, id: genId(), teamId: s.activeTeamId, photo: null }] })),
+  addAthlete: (a) => set((s) => ({ athletes: [...s.athletes, { ...a, id: genId(), teamId: s.activeTeamId, photo: null, parents: (a as any).parents ?? [] }] })),
+  updateAthlete: (id, data) => set((s) => ({ athletes: s.athletes.map((a) => a.id === id ? { ...a, ...data } : a) })),
   removeAthlete: (id) => set((s) => ({ athletes: s.athletes.filter((a) => a.id !== id) })),
   updateAthletePhoto: (id, photo) => set((s) => ({ athletes: s.athletes.map((a) => a.id === id ? { ...a, photo } : a) })),
 
@@ -224,11 +279,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Combo names
   comboNames: {},
   setComboName: (key, name) => set((s) => ({ comboNames: { ...s.comboNames, [key]: name } })),
-  customSkills: { jumps: [], tumbling: [] },
+  customSkills: { jumps: [], tumbling: [] } as Record<string, string[]>,
   addCustomSkill: (category) => set((s) => {
     const label = category === 'jumps' ? 'Jump Combo' : 'Tumble Run';
-    const existing = [...SKILL_LIBRARY[category], ...(s.customSkills[category] ?? [])].filter((sk) => sk.startsWith(label));
-    return { customSkills: { ...s.customSkills, [category]: [...s.customSkills[category], `${label} ${existing.length + 1}`] } };
+    const libSkills = (SKILL_LIBRARY as Record<string, readonly string[]>)[category] ?? [];
+    const existing = [...libSkills, ...(s.customSkills[category] ?? [])].filter((sk) => sk.startsWith(label));
+    return { customSkills: { ...s.customSkills, [category]: [...(s.customSkills[category] ?? []), `${label} ${existing.length + 1}`] } };
   }),
 
   // Stunt groups
@@ -373,4 +429,35 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Thresholds
   customThresholds: { ...ATTENDANCE_PRESETS },
   setCustomThresholds: (t) => set({ customThresholds: t }),
-}));
+    }),
+    {
+      name: 'insync-app-v1',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (s) => ({
+        themeKey: s.themeKey,
+        customTheme: s.customTheme,
+        isPro: s.isPro,
+        ratingDisplayMode: s.ratingDisplayMode,
+        teams: s.teams,
+        activeTeamId: s.activeTeamId,
+        coaches: s.coaches,
+        competitionScores: s.competitionScores,
+        customRubrics: s.customRubrics,
+        seasons: s.seasons,
+        currentSeason: s.currentSeason,
+        season: s.season,
+        athletes: s.athletes,
+        evalLog: s.evalLog,
+        naSkills: s.naSkills,
+        comboNames: s.comboNames,
+        customSkills: s.customSkills,
+        groups: s.groups,
+        groupLog: s.groupLog,
+        pyramids: s.pyramids,
+        attendance: s.attendance,
+        schedule: s.schedule,
+        customThresholds: s.customThresholds,
+      }),
+    },
+  ),
+);

@@ -1,15 +1,21 @@
 export const SKILL_LIBRARY = {
   jumps: [
-    'Spread Eagle', 'Tuck Jump', 'Toe Touch', 'Pike', 'Hurdler', 'Herkie',
-    'Double Nine', 'Jump Combo 1', 'Jump Combo 2',
+    'Double Nine', 'Herkie', 'Hurdler', 'Jump Combo 1', 'Jump Combo 2',
+    'Pike', 'Spread Eagle', 'Toe Touch', 'Tuck Jump',
   ],
   tumbling: [
-    'Forward Roll', 'Cartwheel', 'Roundoff', 'Back Walkover', 'Aerial', 'Valdez',
-    'Back Handspring', 'Back Tuck', 'Standing Tuck', 'Tumble Run 1', 'Tumble Run 2',
+    'Aerial', 'Back Handspring', 'Back Tuck', 'Back Walkover', 'Cartwheel',
+    'Forward Roll', 'Roundoff', 'Standing Tuck', 'Tumble Run 1', 'Tumble Run 2', 'Valdez',
   ],
   stunting: [
-    'Rock Stunt', 'Thigh Stand', 'Prep', 'Extension', 'Liberty',
-    'Scorpion', 'Heel Stretch', 'Basket Toss', 'Full Twist Basket',
+    'Basket Toss', 'Extension', 'Full Twist Basket', 'Heel Stretch', 'Liberty',
+    'Prep', 'Rock Stunt', 'Scorpion', 'Thigh Stand',
+  ],
+  dance: [
+    'Body Control', 'Crowd Leading', 'Full Routine', 'Prep Routine', 'Sharpness', 'Timing',
+  ],
+  motions: [
+    'Broken T', 'Clap', 'Daggers', 'High V', 'Low V', 'Punch', 'T Motion', 'Touchdown',
   ],
 } as const;
 
@@ -36,13 +42,28 @@ export const RATING_LEVELS = [
 
 export type RatingKey = typeof RATING_LEVELS[number]['key'];
 
-export const EVENT_TYPES = ['Practice', 'Competition Week', 'Competition'] as const;
+export const EVENT_TYPES = ['Practice', 'Competition Week', 'Competition', 'Custom'] as const;
 export type EventType = typeof EVENT_TYPES[number];
 
 export const EVENT_PRIORITY: Record<EventType, number> = {
   'Practice': 1,
   'Competition Week': 2,
   'Competition': 3,
+  'Custom': 1,
+};
+
+export const EVENT_TYPE_COLOR: Record<EventType, string> = {
+  'Practice': '#4CAF7D',
+  'Competition Week': '#E8A33D',
+  'Competition': '#D9667A',
+  'Custom': '#5B9BD5',
+};
+
+export const EVENT_TYPE_ICON: Record<EventType, string> = {
+  'Practice': '🏃',
+  'Competition Week': '⚡',
+  'Competition': '🏆',
+  'Custom': '📅',
 };
 
 export const ATTENDANCE_PRESETS = {

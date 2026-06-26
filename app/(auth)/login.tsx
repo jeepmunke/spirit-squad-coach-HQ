@@ -51,8 +51,8 @@ export default function LoginScreen() {
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.appName}>Spirit Squad</Text>
-          <Text style={styles.appSub}>COACH HQ</Text>
+          <Text style={styles.appName}>InSync</Text>
+          <Text style={styles.appSub}>ATHLETICS</Text>
           <Text style={styles.tagline}>Manage your team, track every skill.</Text>
         </View>
 

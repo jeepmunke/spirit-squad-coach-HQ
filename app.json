@@ -1,18 +1,33 @@
 {
   "expo": {
-    "name": "Spirit Squad Coach HQ",
-    "slug": "spirit-squad-coach-hq",
+    "name": "InSync Athletics",
+    "slug": "insync-athletics",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "spiritsquad",
+    "scheme": "insyncathletics",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1B3A4B"
+    },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.spiritsquad.coachhq"
+      "bundleIdentifier": "com.insyncathletics.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
-      "package": "com.spiritsquad.coachhq"
+      "package": "com.insyncathletics.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1B3A4B"
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -20,6 +35,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "933a7a0f-b703-454e-a88b-2168f1464db1"
+      }
+    },
+    "owner": "insync-athletics"
   }
 }
